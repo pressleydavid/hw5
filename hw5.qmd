@@ -1,0 +1,431 @@
+---
+title: "hw5"
+format: html
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+```
+
+
+#Task 1 - Read in and Modify Data
+## Read in data from a localized file source
+```{r}
+d1=read.table("student-mat.csv",sep=";",header=TRUE)
+
+d2=read.table("student-por.csv",sep=";",header=TRUE)
+
+d3=merge(d1,d2,by=c("school","sex","age","address","famsize","Pstatus","Medu","Fedu","Mjob","Fjob","reason","nursery","internet"))
+print(nrow(d3)) # 382 students
+```
+## Read in and combine with tidyverse
+```{r}
+math_tibbs <- as_tibble(d1)
+math_na <- any(is.na(math_tibbs))
+math_missing <- math_tibbs |>
+  filter(if_any(everything(), ~ . == ""))
+
+port_tibbs <- as_tibble(d2)
+port_na <- any(is.na(port_tibbs))
+port_missing <- port_tibbs |>
+  filter(if_any(everything(), ~ . == ""))
+
+combined <- math_tibbs |>
+  inner_join(port_tibbs, by = c("school","sex","age","address","famsize","Pstatus","Medu","Fedu","Mjob","Fjob","reason","nursery","internet"))
+count(combined)
+```
+
+##### Issue - "Warning: Detected an unexpected many-to-many relationship between x and y"
+##### Troubleshooting
+```{r}
+# Detected an unexpected many-to-many relationship between `x` and `y`.
+# ℹ Row 79 of `x` matches multiple rows in `y`.
+# ℹ Row 79 of `y` matches multiple rows in `x`.
+# ℹ If a many-to-many relationship is expected, set `relationship = "many-to-many"` to silence this warning.
+port_row_79 <- port_tibbs |> slice(79)
+math_row_79 <- math_tibbs |> slice(79)
+combo_row_79 <- bind_rows(port_row_79, math_row_79)
+
+```
+
+##### Interpretation - previous selection of by vars do not provide uniqueness in the record (they contain the same values) but the same number of observations as the provided merge exist, so will proceed. Further glimpse() of the duplicate records show the unique key contains all values except `G1`, `G2`, `G3`, `paid`, and `absences`
+```{r}
+glimpse(combo_row_79)
+```
+
+
+### Inner join all vars other than `G1`, `G2`, `G3`, `paid`, and `absences`
+```{r}
+combined <- math_tibbs |>
+  inner_join(port_tibbs, by = c("school","sex","age","address","famsize",
+                                "Pstatus","Medu","Fedu","Mjob","Fjob","reason",
+                                "guardian","traveltime","studytime","failures",
+                                "schoolsup","famsup","activities","nursery",
+                                "internet", "romantic","famrel","freetime",
+                                "goout","Dalc","Walc","health"),
+             suffix = c(".math", ".port")
+  )
+```
+
+### Choose interesting categorical vars and convert to factors
+```{r}
+combined <- combined |>
+  mutate(school = factor(school,
+                         levels = c("GP", "MS"),
+                         labels = c("Gabriel Pereira", "Mousinho da Silveira")),
+         address = factor(address,
+                         levels = c("U", "R"),
+                         labels = c("Urban", "Rural")),
+         reason = factor(reason,
+                         levels = c("course", "home", "reputation", "other"),
+                         labels = c("course", "home", "reputation", "other")),
+         guardian = factor(guardian,
+                           levels = c("mother", "father", "other"),
+                           labels = c("mother", "father", "other")),
+         Mjob = factor(Mjob,
+                       levels = c("at_home","health","other","services","teacher"),
+                       labels = c("at_home","health","other","services","teacher")),
+         Fjob = factor(Fjob,
+                       levels = c("teacher","other","services","health","at_home"),
+                       labels = c("teacher","other","services","health","at_home"))
+
+  )
+
+#check levels are applied according to underlying data
+#"look at how the data are stored and see if everything makes sense"
+
+```
+#### Levels
+##### School
+```{r}
+levels(combined$school)
+```
+##### Address
+```{r}
+levels(combined$address)
+```
+##### Reason
+```{r}
+levels(combined$reason)
+```
+##### Guardian
+```{r}
+levels(combined$guardian)
+```
+##### Mjob
+```{r}
+levels(combined$Mjob)
+```
+##### Fjob
+```{r}
+levels(combined$Fjob)
+```
+## Task 2 - Summarize the Data
+### Document missing values in data 
+#### Result: no missing data found
+```{r}
+# Find the positions of NA values in the tibble
+na_positions <- which(is.na(combined), arr.ind = TRUE)
+
+combined_missing <- combined |>
+  filter(if_any(everything(), ~ . == ""))
+glimpse(combined_missing)
+```
+
+### Categorical Values
+#### Create 1-way contingency table
+##### Interpretation: More students attend Gabriel Pereira than Mousinho da Silveira
+```{r}
+#1-way table (school)
+school_table <- table(combined$school)
+print(school_table)
+```
+
+#### Create 2-way contingency table (school x address)
+##### Interpretation: More urban students attend Gabriel Pereira. More rural students
+                      attend Mousinho da Silveira, but is fairly balanced between 
+                      urban and rural.
+```{r}
+school_by_address_table <- table(combined$school,combined$address)
+print(school_by_address_table)
+```
+
+
+#### Create 3-way contingency table (school x address by reason)
+##### Interpretation: A majority of students attend GP because of it's coursework,
+proximity to home, and reputation. MS seems relatively undifferentiated across
+categories
+```{r}
+school_x_address_by_reason <- table(combined$address,combined$school,combined$reason)
+print(school_x_address_by_reason)
+```
+
+#### Conditional two-way table. Two-ways
+##### First way: subset by filtering
+```{r}
+#filter first
+subset_sch_GP <- combined |>
+  filter(school == "Gabriel Pereira")
+
+address_x_reason <- table(subset_sch_GP$address, subset_sch_GP$reason)
+print(address_x_reason)
+```
+##### Second Way - Subset a 3 way table
+```{r}
+subset_3_way <- school_x_address_by_reason[,"Gabriel Pereira",]
+print(subset_3_way)
+
+```
+
+#### Create a 2-way contingency using group_by() and summarize() + pivot_wider()
+```{r}
+group_by_2_way <- combined |>
+  group_by(school, address, reason) |>
+  summarize(count = n(), .groups = "drop")
+
+print(group_by_2_way)
+
+group_by_2_way_wide <- group_by_2_way |>
+  pivot_wider(names_from = address, values_from = count, values_fill = 0)
+print(group_by_2_way_wide)
+```
+
+#### Create stacked bar graph + side-by-side bar graph
+```{r}
+ggplot(combined, aes(x = address, fill = reason)) +
+  geom_bar(position = "stack") +
+  labs(title = "Distribution of Reasons by Address",
+       x = "Address (Urban/Rural)",
+       y = "Count",
+       fill = "Reason") +
+  theme_minimal()
+
+### Create a side-by-side bar graph with ggplot2
+ggplot(combined, aes(x = address, fill = reason)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of Reasons by Address (Side-by-Side)",
+       x = "Address (Urban/Rural)",
+       y = "Count",
+       fill = "Reason") +
+  theme_minimal()
+
+```
+
+### Numeric Variables (and across groups)
+#### Find measures of center and spread (G3 (from math dataset), age, absence)
+```{r}
+summary_stats <- combined |>
+  summarize(
+    g3_mean = mean(G3.math, na.rm = TRUE),
+    g3_median = median(G3.math, na.rm = TRUE),
+    g3_sd = sd(G3.math, na.rm = TRUE),
+    g3_iqr = IQR(G3.math, na.rm = TRUE),
+
+    age_mean = mean(age, na.rm = TRUE),
+    age_median = median(age, na.rm = TRUE),
+    age_sd = sd(age, na.rm = TRUE),
+    age_iqr = IQR(age, na.rm = TRUE),
+
+    absences_mean = mean(absences.math, na.rm = TRUE),
+    absences_median = median(absences.math, na.rm = TRUE),
+    absences_sd = sd(absences.math, na.rm = TRUE),
+    absences_iqr = IQR(absences.math, na.rm = TRUE),
+  ) |>
+  pivot_longer(
+    cols = everything(),
+    names_to = "statistic",
+    values_to = "value"
+  )
+print(summary_stats)
+
+```
+#### Subset in a meaningful way
+```{r}
+summary_stats_grp_by <- combined |>
+  filter(school == "Gabriel Pereira") |>
+  group_by(school, address, reason) |>
+  summarize(
+    g3_mean = mean(G3.math, na.rm = TRUE),
+    g3_median = median(G3.math, na.rm = TRUE),
+    g3_sd = sd(G3.math, na.rm = TRUE),
+    g3_iqr = IQR(G3.math, na.rm = TRUE),
+
+    age_mean = mean(age, na.rm = TRUE),
+    age_median = median(age, na.rm = TRUE),
+    age_sd = sd(age, na.rm = TRUE),
+    age_iqr = IQR(age, na.rm = TRUE),
+
+    absences_mean = mean(absences.math, na.rm = TRUE),
+    absences_median = median(absences.math, na.rm = TRUE),
+    absences_sd = sd(absences.math, na.rm = TRUE),
+    absences_iqr = IQR(absences.math, na.rm = TRUE),
+    .groups = "drop"
+  )
+print(summary_stats_grp_by)
+```
+
+#### measures of center and spread across a single grouping (school)
+```{r}
+summary_stats_single_grp <- combined |>
+  group_by(school) |>
+  summarize(
+    g3_mean = mean(G3.math, na.rm = TRUE),
+    g3_median = median(G3.math, na.rm = TRUE),
+    g3_sd = sd(G3.math, na.rm = TRUE),
+    g3_iqr = IQR(G3.math, na.rm = TRUE),
+
+    age_mean = mean(age, na.rm = TRUE),
+    age_median = median(age, na.rm = TRUE),
+    age_sd = sd(age, na.rm = TRUE),
+    age_iqr = IQR(age, na.rm = TRUE),
+
+    absences_mean = mean(absences.math, na.rm = TRUE),
+    absences_median = median(absences.math, na.rm = TRUE),
+    absences_sd = sd(absences.math, na.rm = TRUE),
+    absences_iqr = IQR(absences.math, na.rm = TRUE),
+  )
+print(summary_stats_single_grp)
+```
+
+#### measures of center and spread across a double grouping (school, address)
+```{r}
+summary_stats_double_grp <- combined |>
+  group_by(school, address) |>
+  summarize(
+    g3_mean = mean(G3.math, na.rm = TRUE),
+    g3_median = median(G3.math, na.rm = TRUE),
+    g3_sd = sd(G3.math, na.rm = TRUE),
+    g3_iqr = IQR(G3.math, na.rm = TRUE),
+
+    age_mean = mean(age, na.rm = TRUE),
+    age_median = median(age, na.rm = TRUE),
+    age_sd = sd(age, na.rm = TRUE),
+    age_iqr = IQR(age, na.rm = TRUE),
+
+    absences_mean = mean(absences.math, na.rm = TRUE),
+    absences_median = median(absences.math, na.rm = TRUE),
+    absences_sd = sd(absences.math, na.rm = TRUE),
+    absences_iqr = IQR(absences.math, na.rm = TRUE),
+  )
+print(summary_stats_double_grp)
+```
+
+#### Correlation matrix for numeric variables
+```{r}
+num_vars <- combined |>
+  select(where(is.numeric))
+
+corr_matrix <- cor(num_vars, use = "complete.obs")
+print(corr_matrix)
+```
+
+#### Create histogram, kernel density, and boxplots
+```{r}
+#Historgram of G3 across school
+# Create histogram for G3 across school
+ggplot(combined, aes(x = G3.math, fill = school)) +
+  geom_histogram(alpha = 0.6, position = "identity", bins = 20) +  # position = "identity" overlays the bars
+  labs(title = "Distribution of Math Grades (G3.math) by School",
+       x = "Math Grade (G3.math)",
+       y = "Count",
+       fill = "School") +
+  theme_minimal()
+```
+##### Comment: Distribution of Grade 3 math scores are fairly normal, slightly skewed right
+
+```{r}
+#kernel density of absences by school
+ggplot(combined, aes(x = absences.math, fill = school)) +
+  geom_density(alpha = 0.6) +
+  labs(title = "Kernel Density of Absences by School",
+       x = "Number of Absences",
+       y = "Density",
+       fill = "School") +
+  theme_minimal()
+```
+##### Comment: most students from both schools do not have a lot of absences
+
+```{r}
+# Boxplot for G3 across school
+ggplot(combined, aes(x = school, y = G3.math, fill = school)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Boxplot of Final Period Grade (G3.math) by School",
+       x = "School",
+       y = "Grade (G3.math)",
+       fill = "School") +
+  theme_minimal()
+```
+##### Comment: G3 math scores are fairly evenly distributed between schools
+
+
+#### Create Scatterplot of G3.math vs. absences with jitter and color by school (no faceting)
+
+```{r}
+ggplot(combined, aes(x = absences.math, y = G3.math, color = school)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.8) +  
+  labs(title = "Grade (G3.math) vs. Absences by School",
+       x = "Number of Absences",
+       y = "Final Period Grade (G3.math)",
+       color = "School") +
+  theme_minimal()
+
+# Scatterplot of G3 vs. age with jitter and color by sex
+ggplot(combined, aes(x = age, y = G3.math, color = sex)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.8) +  
+  labs(title = "Final Period Grade (G3.math) vs. Age by Sex",
+       x = "Age",
+       y = "Final Period Grade (G3.math)",
+       color = "Sex") +
+  theme_minimal()
+```
+##### Comment: Final Period Grade (G3.math) scores are evenly scattered between sex for a given age
+
+
+
+#### Create Scatterplot of G3 vs. absences with faceting by sex and color by school
+
+```{r}
+ggplot(combined, aes(x = absences.math, y = G3.math, color = school)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.8) +
+  labs(title = "Final Grade (G3) vs. Absences, Faceted by Sex",
+       x = "Number of Absences",
+       y = "Final Grade (G3)",
+       color = "School") +
+  theme_minimal() +
+  facet_wrap(~ sex) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1),
+    panel.spacing = unit(1, "lines")
+  )
+
+
+# Scatterplot of G3 vs. age with faceting by school and color by sex
+ggplot(combined, aes(x = age, y = G3.math, color = sex)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.8) +  # Jitter to avoid overlap
+  labs(title = "Final Grade (G3) vs. Age, Faceted by School",
+       x = "Age",
+       y = "Final Grade (G3)",
+       color = "Sex") +
+  theme_minimal() +
+  facet_wrap(~ school) +  # Facet by the 'school' variable
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1),  # Add a black border around each facet
+    panel.spacing = unit(1, "lines")  # Increase the space between facets
+  )
+
+# Scatterplot of G3 vs. age, faceted by school and sex
+ggplot(combined, aes(x = age, y = G3.math, color = school)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.8) +  # Jitter to avoid overlap
+  labs(title = "Final Grade (G3) vs. Age, Faceted by School and Sex",
+       x = "Age",
+       y = "Final Grade (G3)",
+       color = "School") +
+  theme_minimal() +
+  facet_grid(sex ~ school) +  # Facet by 'sex' for rows and 'school' for columns
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, size = 1),  # Add a border around each facet
+    panel.spacing = unit(1, "lines")  # Increase the space between facets
+  )
+```
+##### Comment: Final Period Grade (G3.math) scores are evenly scattered throughout most categories, with one interesting note that there seem to be very few Final Grades for G3.math given for MS students under the age of ~16-18
