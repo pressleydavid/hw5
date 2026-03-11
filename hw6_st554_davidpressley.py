@@ -137,7 +137,8 @@ class SLR_slope_simulator:
         sided options:
           "above" = P(slope > value)
           "below" = P(slope < value)
-          "two-sided" = P(|slope| > |value|)
+          "two-sided" = 2 * P(slope > value) if value >= median, else 2 * P(slope < value)
+
 
         Implementation note:
         1. For two-sided, we check if the value is above or below the median of the
