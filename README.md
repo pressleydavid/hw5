@@ -8,6 +8,6 @@
 
 ### HW6 - Part I is contained in the file: `hw6_st554_davidpressley.ipynb`
 - Due: March 11, 2026
-- 
+
 ### HW6 - Part II is contained in the file: `hw6_st554_davidpressley.py`
 - Due: March 11, 2026
