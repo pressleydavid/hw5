@@ -28,9 +28,9 @@ Create a class called `SLR_slope_simulator` that encapsulates the simulation of 
 
 Recall we assume the following model for SLR:
 
-$$Y_i = \beta_0 + \beta_1 x_i + E_i$$
+Y_i = \beta_0 + \beta_1 x_i + E_i
 
-where the $E_i$ are assumed to be independent and identically distributed from a Normal distribution with mean 0 and variance $\sigma^2$.
+where the E_i are assumed to be independent and identically distributed from a Normal distribution with mean 0 and variance sigma^2.
 
 #### Class Definition
 
@@ -84,7 +84,7 @@ class SLR_slope_simulator:
         return self.x, y
 
     def fit_slope(self, x, y):
-        """ Fit and SLR model to x and y. Return fitted slope """
+        """ Fit an SLR model to x and y. Return fitted slope """
         # takes (x, y), fits SLR model, returns estimated slope
         reg = linear_model.LinearRegression()
         fit = reg.fit(x.reshape(-1,1), y)
@@ -159,13 +159,13 @@ print(f"Simulation created with beta_0={sim.beta_0}, beta_1={sim.beta_1}, n={sim
 type(sim)
 
 """ Call `run_simulations()` before running simulations (should return error message)"""
-sim.plot_sampling_distribution()
+print(sim.plot_sampling_distribution())
 
 """ Run 10,000 simulations to approximate the sampling distribution of the slope"""
-sim.run_simulations(10000)
+print(sim.run_simulations(10000))
 
 """ Plot the sampling distribution"""
-sim.plot_sampling_distribution()
+print(sim.plot_sampling_distribution())
 print("Printing sampling distribution plot...")
 
 """ Approximate the two-sided probability of being larger than 2.1"""
@@ -176,3 +176,4 @@ print(f"Two-sided probability of being larger than 2.1: {prob}")
 """ Print out the simulated slopes"""
 # print array of slopes from slopes attribute.
 print(f"Array of slopes from slopes attribute: {sim.slopes}")
+print(f"Number of slopes: {len(sim.slopes)}")
