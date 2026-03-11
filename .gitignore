@@ -20,3 +20,6 @@ build/
 *.uvprojx
 *.lock
 *.toml
+
+# source data
+baseball-archive-sqlite/*
