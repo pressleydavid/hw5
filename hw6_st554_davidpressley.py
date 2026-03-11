@@ -126,7 +126,11 @@ class SLR_slope_simulator:
         plt.legend()
         plt.show()
 
-    # takes a value and sided argument ("above", "below", or "two-sided") and approximates the corresponding probability
+    # takes a value and sided argument ("above", "below", or "two-sided")
+    # and approximates the corresponding probability
+    # if two-sided, check if value is above or below median of slopes to
+    # determine which tail to use, and use 2x the one-sided probability to
+    # get two-sided probability
     def find_prob(self, value, sided):
         """Approximate probability based on simulated slopes.
 
@@ -134,6 +138,15 @@ class SLR_slope_simulator:
           "above" = P(slope > value)
           "below" = P(slope < value)
           "two-sided" = P(|slope| > |value|)
+
+        Implementation note:
+        1. For two-sided, we check if the value is above or below the median of the
+        slopes to determine which tail to use. We then calculate the one-sided
+        probability and multiply by 2 to get the two-sided probability.
+
+        2. We use the mean of the boolean array (i.e. [T,F,T,T,F...] for (self.slopes >/< value)
+        to get the proportion of slopes that satisfy the condition, the mean of which gives us
+        the probability: (how many slopes are above/below the value) / (total number of slopes) = probability
         """
         if len(self.slopes) == 0:
             print("run_simulations() must be called first")
@@ -143,8 +156,11 @@ class SLR_slope_simulator:
         elif sided == "below":
             return (self.slopes < value).mean()
         elif sided == "two-sided":
-            return (np.abs(self.slopes) > abs(value)).mean()
-
+            print(f"Median of slopes: {np.median(self.slopes)} ")
+            if value >= np.median(self.slopes):
+                return 2*(self.slopes > value).mean()
+            else:
+                return 2*(self.slopes < value).mean()
 """ Testing the Class
 Create an instance of the object with `beta_0 = 12`, `beta_1 = 2`,
 `x = np.array(list(np.linspace(start = 0, stop = 10, num = 11))*3)`,
@@ -159,13 +175,13 @@ print(f"Simulation created with beta_0={sim.beta_0}, beta_1={sim.beta_1}, n={sim
 type(sim)
 
 """ Call `run_simulations()` before running simulations (should return error message)"""
-print(sim.plot_sampling_distribution())
+sim.plot_sampling_distribution()
 
 """ Run 10,000 simulations to approximate the sampling distribution of the slope"""
-print(sim.run_simulations(10000))
+sim.run_simulations(10000)
 
 """ Plot the sampling distribution"""
-print(sim.plot_sampling_distribution())
+sim.plot_sampling_distribution()
 print("Printing sampling distribution plot...")
 
 """ Approximate the two-sided probability of being larger than 2.1"""
