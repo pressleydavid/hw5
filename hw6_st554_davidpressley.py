@@ -1,6 +1,6 @@
 """HW6_ST554_DavidPressley_Part2.py
 
-Original file is located at
+Original file for Part I is located at
     https://colab.research.google.com/drive/1VTo5HAbc6HCZZShtl3lnGXV0eoe2T2zx
 
 HW6 - Part II
